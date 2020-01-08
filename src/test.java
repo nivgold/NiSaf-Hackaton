@@ -10,8 +10,6 @@ public class test {
 
         Client client = new Client();
         client.start();
-
-        //System.out.println(hash("sex"));
     }
 
     private static String hash(String string){

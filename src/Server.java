@@ -1,5 +1,4 @@
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -28,9 +27,10 @@ public class Server implements Runnable{
     public void run() {
         ExecutorService pool = Executors.newFixedThreadPool(2);
         DatagramPacket datagramPacket = null;
+        System.out.println("Server Is Running");
         while (!stop){
-            byte[] buffer = new byte[Util.BUFFER_SIZE];
-            datagramPacket = new DatagramPacket(buffer, Util.BUFFER_SIZE);
+            byte[] buffer = new byte[Util.MAX_BUFFER_SIZE];
+            datagramPacket = new DatagramPacket(buffer, Util.MAX_BUFFER_SIZE);
             try {
                 serverUDPSocket.receive(datagramPacket);
                 System.out.println("Server Received Packet");
@@ -43,50 +43,20 @@ public class Server implements Runnable{
     }
 
     private void serverStrategy(DatagramPacket clientPacket){
-        byte[] data = clientPacket.getData();
-        byte[] teamNameBytes = new byte[32];
-        char[] teamName = null;
-        byte[] typeBytes = new byte[1];
-        char[] type = null;
-        byte[] hashBytes = new byte[40];
-        char[] hash = null;
-        byte[] lengthBytes = new byte[1];
-        char[] length = null;
-        byte[] startBytes = new byte[256];
-        char[] start = null;
-        byte[] endBytes = new byte[256];
-        char[] end = null;
-        try{
-            for (int i=0; i<586; i++) {
-                if (i<32)
-                    teamNameBytes[i] = data[i];
-                if (i==32)
-                    typeBytes[0] = data[i];
-                if (i>=33 && i<73)
-                    hashBytes[i-33] = data[i];
-                if (i==73)
-                    lengthBytes[0] = data[i];
-                if (i>=74 && i<330)
-                    startBytes[i-74] = data[i];
-                if (i>=330)
-                    endBytes[i-330] = data[i];
-            }
-            teamName = new String(teamNameBytes, "UTF-8").toCharArray();
-            type = new String(typeBytes, "UTF-8").toCharArray();
-            hash = new String(hashBytes, "UTF-8").toCharArray();
-            length = new String(lengthBytes, "UTF-8").toCharArray();
-            start = new String(startBytes, "UTF-8").toCharArray();
-            end = new String(endBytes, "UTF-8").toCharArray();
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
+        int length = (clientPacket.getData()[73]) & 0xFF;
+        byte[] clientPacketData = clientPacket.getData();
+        int payloadSize = 74+length*2;
+        char teamNameChars[] = new char[32];
+        for (int i=0; i<32; i++)
+            teamNameChars[i] = (char)clientPacketData[i];
 
-        switch (type[0]){
+        char type = (char)clientPacketData[32];
+        switch (type){
             case '1':
                 // broadcast
                 try{
-                    byte[] toClientData = Util.makePacketData(teamName, "2".toCharArray()[0], hash, length[0], start, end);
-                    DatagramPacket toClientPacket = new DatagramPacket(toClientData, Util.BUFFER_SIZE, clientPacket.getAddress(), clientPacket.getPort());
+                    byte[] toClientData = Util.makePacketData(teamNameChars, "2".toCharArray()[0], "".toCharArray(), length, "".toCharArray(), "".toCharArray());
+                    DatagramPacket toClientPacket = new DatagramPacket(toClientData, payloadSize, clientPacket.getAddress(), clientPacket.getPort());
                     serverUDPSocket.send(toClientPacket);
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -95,14 +65,24 @@ public class Server implements Runnable{
             case '3':
                 // Request
                 System.out.println("Server Received Work");
-                String startPos = new String(start);
-                String endPos = new String(end);
+                char[] startChars = new char[length];
+                char[] endChars = new char[length];
+                for (int i=74 ;i<74+length; i++)
+                    startChars[i-74] = (char)clientPacketData[i];
+                for (int i=74+length; i<74+length*2; i++)
+                    endChars[i-74-length] = (char)clientPacketData[i];
+
+                char[] hash = new char[40];
+                for (int i=33; i<73; i++)
+                    hash[i-33] = (char)clientPacketData[i];
+                String startPos = new String(startChars);
+                String endPos = new String(endChars);
                 String originalHash = new String(hash);
-                String result = jailbreak(startPos, endPos, originalHash, Integer.parseInt(length[0]+""));
+                String result = jailbreak(startPos, endPos, originalHash, length);
                 if (result == null){
                     // send NACK Packet
-                    byte[] toClientData = Util.makePacketData(teamName, "5".toCharArray()[0],hash, length[0], start, end);
-                    DatagramPacket toClientPacket = new DatagramPacket(toClientData, Util.BUFFER_SIZE, clientPacket.getAddress(), clientPacket.getPort());
+                    byte[] toClientData = Util.makePacketData(teamNameChars, "5".toCharArray()[0],hash, length, startChars, endChars);
+                    DatagramPacket toClientPacket = new DatagramPacket(toClientData, payloadSize, clientPacket.getAddress(), clientPacket.getPort());
                     try {
                         serverUDPSocket.send(toClientPacket);
                     } catch (IOException e) {
@@ -111,10 +91,8 @@ public class Server implements Runnable{
                 }
                 else{
                     // send ACK Packet
-                    char[] resultChars = new char[256];
-                    System.arraycopy(result.toCharArray(), 0, resultChars, 0, Integer.parseInt(length[0]+""));
-                    byte[] toClientData = Util.makePacketData(teamName, "4".toCharArray()[0], hash, length[0], resultChars, end);
-                    DatagramPacket toClientPacket = new DatagramPacket(toClientData, Util.BUFFER_SIZE, clientPacket.getAddress(), clientPacket.getPort());
+                    byte[] toClientData = Util.makePacketData(teamNameChars, "4".toCharArray()[0], hash, length, result.toCharArray(), endChars);
+                    DatagramPacket toClientPacket = new DatagramPacket(toClientData, payloadSize, clientPacket.getAddress(), clientPacket.getPort());
                     try {
                         serverUDPSocket.send(toClientPacket);
                     } catch (IOException e) {

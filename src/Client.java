@@ -2,109 +2,146 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 public class Client {
     private DatagramSocket clientSocket;
     private int defaultTimeOut;
+    private final String TEAM_NAME = "Doofenshmirtz Evil Inc.         ";
 
     public Client() {
         try {
             this.clientSocket = new DatagramSocket(5000);
             defaultTimeOut = clientSocket.getSoTimeout();
-            clientSocket.setSoTimeout(1000);
         } catch (SocketException e) {
             e.printStackTrace();
         }
     }
 
     public void start(){
-        try {
-            ArrayList<InetAddress> addresses = new ArrayList<>();
-            byte[] buffer = new byte[586];
-            String teamName = "NiSaf                           ";
-            System.arraycopy(teamName.getBytes(StandardCharsets.UTF_8), 0, buffer, 0, 32);
+        Scanner scanner = new Scanner(System.in);
+        while (true){
+            try {
+                clientSocket.setSoTimeout(750);
+            } catch (SocketException e) {
+                e.printStackTrace();
+            }
+            System.out.print("Welcome to "+TEAM_NAME+". Please enter the hash:");
+            String hash = scanner.nextLine();
+            System.out.println("Please enter the input string length:");
+            String lengthString = scanner.nextLine();
+            Integer length;
+            while ((length = Util.isInteger(lengthString))==null){
+                System.out.println("Invalid length. enter the input string length:");
+                lengthString = scanner.nextLine();
+            }
+            int payloadSize = 74+length*2;
+            byte[] discoverPacketPayload = new byte[payloadSize];
+            System.arraycopy(TEAM_NAME.getBytes(StandardCharsets.UTF_8), 0, discoverPacketPayload, 0, 32);
             String type = "1";
-            buffer[32] = type.getBytes(StandardCharsets.UTF_8)[0];
-            String hash = "68bb04bd54b8f6c530695e0b77de298276a0511d";
-            System.arraycopy(hash.getBytes(StandardCharsets.UTF_8), 0, buffer, 33, 40);
-            String length = "3";
-            buffer[73] = length.getBytes(StandardCharsets.UTF_8)[0];
-            String start = "";
-            byte[] startBytes = new byte[256];
-            //System.arraycopy(start.getBytes(StandardCharsets.UTF_8), 0, startBytes, 0, 3);
-            System.arraycopy(startBytes, 0, buffer, 74, 256);
-            String end = "";
-            byte[] endBytes = new byte[256];
-            //System.arraycopy(end.getBytes(StandardCharsets.UTF_8), 0, endBytes, 0, 3);
-            System.arraycopy(endBytes, 0, buffer, 330, 256);
+            discoverPacketPayload[32] = type.getBytes(StandardCharsets.UTF_8)[0];
+            //TODO check that hash is indeed 40 chars
+            System.arraycopy(hash.getBytes(StandardCharsets.UTF_8), 0, discoverPacketPayload, 33, 40);
+            discoverPacketPayload[73] = length.byteValue();
+            // start and end data
+            System.arraycopy(new byte[length*2], 0, discoverPacketPayload, 74, length*2);
 
-            InetAddress address = InetAddress.getByName("255.255.255.255");
-            clientSocket.setBroadcast(true);
-            DatagramPacket packet = new DatagramPacket(buffer, 586, address, 3117);
-            clientSocket.send(packet);
-            clientSocket.setBroadcast(false);
+            ArrayList<InetAddress> serversAddresses = new ArrayList<>();
 
-            Thread.sleep(1000);
+            // sending DISCOVER Packet
+            try {
+                InetAddress broadcastAddress = InetAddress.getByAddress(new byte[] {(byte)255, (byte)255, (byte)255, (byte)255});
+                clientSocket.setBroadcast(true);
+                DatagramPacket discoverPacket = new DatagramPacket(discoverPacketPayload, discoverPacketPayload.length, broadcastAddress, 3117);
+                clientSocket.send(discoverPacket);
+                clientSocket.setBroadcast(false);
 
+                //DatagramPacket discoverPacket = new DatagramPacket(discoverPacketPayload, discoverPacketPayload.length, InetAddress.getByName("192.168.43.38"), 3117);
+                //clientSocket.send(discoverPacket);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+            //catch (SocketException e) {
+            //    e.printStackTrace();
+            //}
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            // Receiving OFFER Packets
             long startOFFERTime = System.currentTimeMillis();
             long endOFFERTime = startOFFERTime + 1000;
             while (System.currentTimeMillis() <= endOFFERTime){
-                byte[] data = new byte[Util.BUFFER_SIZE];
-                DatagramPacket rcv = new DatagramPacket(data, Util.BUFFER_SIZE);
+                byte[] offerPacketPayload = new byte[payloadSize];
+                DatagramPacket offerPacket = new DatagramPacket(offerPacketPayload, payloadSize);
                 try {
-                    clientSocket.receive(rcv);
+                    clientSocket.receive(offerPacket);
                 }catch (SocketTimeoutException e){
-
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-
-                if (rcv.getData() != null) {
-                    char serverType = (char) rcv.getData()[32];
+                if (offerPacket.getData() != null) {
+                    char serverType = (char) offerPacket.getData()[32];
                     if (serverType == '2')
-                        addresses.add(rcv.getAddress());
+                        serversAddresses.add(offerPacket.getAddress());
                 }
             }
 
+            if (serversAddresses.size()==0){
+                System.out.println("No Servers Found");
+                continue;
+            }
+
+            // Sending REQUEST Packets
             System.out.println("Sending Work To Servers");
-            divideWork(addresses, teamName.toCharArray(), "3".toCharArray()[0], hash.toCharArray(), length.toCharArray()[0]);
-
-            System.out.println("waiting for servers");
-            byte[] data = new byte[Util.BUFFER_SIZE];
-            DatagramPacket rcv = new DatagramPacket(data, Util.BUFFER_SIZE);
             try {
-                clientSocket.setSoTimeout(defaultTimeOut);
-                clientSocket.receive(rcv);
-                System.out.println("Received From Server");
-                byte[] serverData = rcv.getData();
-                byte serverType = serverData[32];
-                if ((char)serverType == '4'){
-                    // Received ACK
-                    byte[] result = new byte[256];
-                    for (int i=74; i< 330 ; i++)
-                        result[i-74] = serverData[i];
-                    String resultString = new String(result, StandardCharsets.UTF_8);
-                    System.out.println("Cracked String:"+resultString);
-                }
-            }catch (SocketTimeoutException e){
-                System.out.println("No Answer From Any Server");
+                divideWork(serversAddresses, TEAM_NAME.toCharArray(), "3".toCharArray()[0], hash.toCharArray(), length);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
-        } catch (SocketException e) {
-            e.printStackTrace();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            // Receiving ACK/NACK Packets
+            System.out.println("Waiting For Servers ACK/NACK Respond");
+            long startACKTime = System.currentTimeMillis();
+            // 15 seconds timeout
+            long endACKTime = startACKTime + 15000;
+            while (System.currentTimeMillis() <= endACKTime){
+                byte[] resultPacketPayload = new byte[payloadSize];
+                DatagramPacket resultPacket = new DatagramPacket(resultPacketPayload, payloadSize);
+                try {
+                    clientSocket.setSoTimeout(15000);
+                    clientSocket.receive(resultPacket);
+                    System.out.println("Received From Server");
+                    byte[] resultServerData = resultPacket.getData();
+                    byte serverType = resultServerData[32];
+                    if ((char)serverType == '4'){
+                        // Received ACK
+                        byte[] result = new byte[length];
+                        for (int i=74; i< 74+length ; i++)
+                            result[i-74] = resultServerData[i];
+                        String resultString = new String(result, StandardCharsets.UTF_8);
+                        System.out.println("Cracked String:"+resultString);
+                        break;
+                    }
+                    else if ((char)serverType == '5'){
+                        // Received NACK
+                        System.out.println("Client Received NACK From Server:"+resultPacket.getAddress().getHostAddress());
+                    }
+                }catch (SocketTimeoutException e){
+                    System.out.println("No Answer From Any Server");
+                } catch (SocketException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
-
     }
 
-    private void divideWork(ArrayList<InetAddress> addresses, char[] teamName, char type, char[] hash, char length) throws IOException {
+    private void divideWork(ArrayList<InetAddress> addresses, char[] teamName, char type, char[] hash, int length) throws IOException {
         int serverAmount = addresses.size();
         StringBuilder stringBuilder = new StringBuilder();
-        int lengthInteger = Integer.parseInt(length+"");
-        for (int i=0; i<lengthInteger; i++)
+        for (int i=0; i<length; i++)
             stringBuilder.append('z');
         String maxString = stringBuilder.toString();
         int maxNumber = Util.convertStringToInt(maxString);
@@ -114,27 +151,23 @@ public class Client {
         String endPos;
         for (int i=0; i<Math.min(serverAmount, maxNumber); i++){
             if (i==0) {
-                startPos = Util.convertIntegerToString(i * division, lengthInteger);
-                endPos = Util.convertIntegerToString((i + 1) * division, lengthInteger);
+                startPos = Util.convertIntegerToString(i * division, length);
+                endPos = Util.convertIntegerToString((i + 1) * division, length);
             }
             else if (i<serverAmount-1){
-                startPos = Util.convertIntegerToString(i * division + 1, lengthInteger);
-                endPos = Util.convertIntegerToString((i + 1) * division, lengthInteger);
+                startPos = Util.convertIntegerToString(i * division + 1, length);
+                endPos = Util.convertIntegerToString((i + 1) * division, length);
             }
             else{
-                startPos = Util.convertIntegerToString(i * division + 1, lengthInteger);
+                startPos = Util.convertIntegerToString(i * division + 1, length);
                 endPos = maxString;
             }
-            char[] startChars = new char[256];
-            System.arraycopy(startPos.toCharArray(), 0, startChars, 0, startPos.toCharArray().length);
-            char[] endChars = new char[256];
-            System.arraycopy(endPos.toCharArray(), 0, endChars, 0, endPos.toCharArray().length);
 
-            byte[] data = Util.makePacketData(teamName, type, hash, length, startChars, endChars);
+            byte[] requestPacketPayload = Util.makePacketData(teamName, type, hash, length, startPos.toCharArray(), endPos.toCharArray());
 
-            DatagramPacket toServer = new DatagramPacket(data, data.length, addresses.get(i), 3117);
+            DatagramPacket toServer = new DatagramPacket(requestPacketPayload, requestPacketPayload.length, addresses.get(i), 3117);
             clientSocket.send(toServer);
-            System.out.println("Sent Work Packet To Server");
+            System.out.println("Sent Work Packet To Server:"+addresses.get(i).getHostAddress());
         }
     }
 }
