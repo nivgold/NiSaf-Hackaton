@@ -28,6 +28,11 @@ public class Client {
             }
             System.out.print("Welcome to "+TEAM_NAME+". Please enter the hash:");
             String hash = scanner.nextLine();
+            while (!Util.isValidHash(hash)){
+                System.out.println("Invalid Hash");
+                System.out.print("Welcome to "+TEAM_NAME+". Please enter the hash:");
+                hash = scanner.nextLine();
+            }
             System.out.println("Please enter the input string length:");
             String lengthString = scanner.nextLine();
             Integer length;
@@ -38,8 +43,7 @@ public class Client {
             int payloadSize = 74+length*2;
             byte[] discoverPacketPayload = new byte[payloadSize];
             System.arraycopy(TEAM_NAME.getBytes(StandardCharsets.UTF_8), 0, discoverPacketPayload, 0, 32);
-            String type = "1";
-            discoverPacketPayload[32] = type.getBytes(StandardCharsets.UTF_8)[0];
+            discoverPacketPayload[32] = '\1';
             //TODO check that hash is indeed 40 chars
             System.arraycopy(hash.getBytes(StandardCharsets.UTF_8), 0, discoverPacketPayload, 33, 40);
             discoverPacketPayload[73] = length.byteValue();
@@ -81,8 +85,8 @@ public class Client {
                     e.printStackTrace();
                 }
                 if (offerPacket.getData() != null) {
-                    char serverType = (char) offerPacket.getData()[32];
-                    if (serverType == '2')
+                    byte serverType = offerPacket.getData()[32];
+                    if (serverType == '\2')
                         serversAddresses.add(offerPacket.getAddress());
                 }
             }
@@ -95,7 +99,7 @@ public class Client {
             // Sending REQUEST Packets
             System.out.println("Sending Work To Servers");
             try {
-                divideWork(serversAddresses, TEAM_NAME.toCharArray(), "3".toCharArray()[0], hash.toCharArray(), length);
+                divideWork(serversAddresses, TEAM_NAME.toCharArray(), "\3".getBytes(StandardCharsets.UTF_8)[0], hash.toCharArray(), length);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -114,7 +118,7 @@ public class Client {
                     System.out.println("Received From Server");
                     byte[] resultServerData = resultPacket.getData();
                     byte serverType = resultServerData[32];
-                    if ((char)serverType == '4'){
+                    if (serverType == '\4'){
                         // Received ACK
                         byte[] result = new byte[length];
                         for (int i=74; i< 74+length ; i++)
@@ -123,7 +127,7 @@ public class Client {
                         System.out.println("Cracked String:"+resultString);
                         break;
                     }
-                    else if ((char)serverType == '5'){
+                    else if (serverType == '\5'){
                         // Received NACK
                         System.out.println("Client Received NACK From Server:"+resultPacket.getAddress().getHostAddress());
                     }
@@ -138,7 +142,7 @@ public class Client {
         }
     }
 
-    private void divideWork(ArrayList<InetAddress> addresses, char[] teamName, char type, char[] hash, int length) throws IOException {
+    private void divideWork(ArrayList<InetAddress> addresses, char[] teamName, byte type, char[] hash, int length) throws IOException {
         int serverAmount = addresses.size();
         StringBuilder stringBuilder = new StringBuilder();
         for (int i=0; i<length; i++)

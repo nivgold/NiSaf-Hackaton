@@ -50,19 +50,19 @@ public class Server implements Runnable{
         for (int i=0; i<32; i++)
             teamNameChars[i] = (char)clientPacketData[i];
 
-        char type = (char)clientPacketData[32];
+        byte type = clientPacketData[32];
         switch (type){
-            case '1':
+            case '\1':
                 // broadcast
                 try{
-                    byte[] toClientData = Util.makePacketData(teamNameChars, "2".toCharArray()[0], "".toCharArray(), length, "".toCharArray(), "".toCharArray());
+                    byte[] toClientData = Util.makePacketData(teamNameChars, "\2".getBytes(StandardCharsets.UTF_8)[0], "".toCharArray(), length, "".toCharArray(), "".toCharArray());
                     DatagramPacket toClientPacket = new DatagramPacket(toClientData, payloadSize, clientPacket.getAddress(), clientPacket.getPort());
                     serverUDPSocket.send(toClientPacket);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
                 break;
-            case '3':
+            case '\3':
                 // Request
                 System.out.println("Server Received Work");
                 char[] startChars = new char[length];
@@ -81,7 +81,7 @@ public class Server implements Runnable{
                 String result = jailbreak(startPos, endPos, originalHash, length);
                 if (result == null){
                     // send NACK Packet
-                    byte[] toClientData = Util.makePacketData(teamNameChars, "5".toCharArray()[0],hash, length, startChars, endChars);
+                    byte[] toClientData = Util.makePacketData(teamNameChars, "\5".getBytes(StandardCharsets.UTF_8)[0],hash, length, startChars, endChars);
                     DatagramPacket toClientPacket = new DatagramPacket(toClientData, payloadSize, clientPacket.getAddress(), clientPacket.getPort());
                     try {
                         serverUDPSocket.send(toClientPacket);
@@ -91,7 +91,7 @@ public class Server implements Runnable{
                 }
                 else{
                     // send ACK Packet
-                    byte[] toClientData = Util.makePacketData(teamNameChars, "4".toCharArray()[0], hash, length, result.toCharArray(), endChars);
+                    byte[] toClientData = Util.makePacketData(teamNameChars, "\4".getBytes(StandardCharsets.UTF_8)[0], hash, length, result.toCharArray(), endChars);
                     DatagramPacket toClientPacket = new DatagramPacket(toClientData, payloadSize, clientPacket.getAddress(), clientPacket.getPort());
                     try {
                         serverUDPSocket.send(toClientPacket);
@@ -111,9 +111,9 @@ public class Server implements Runnable{
     }
 
     private String jailbreak(String startPos, String endPos, String originalHash, int length){
-        int start = Util.convertStringToInt(startPos);
-        int end = Util.convertStringToInt(endPos);
-        for (int i=start; i<=end; i++) {
+        BigInteger start = new BigInteger(startPos);
+        BigInteger end = new BigInteger(endPos);
+        for (BigInteger i=start; i.compareTo(end)<=0; i=i.add(new BigInteger("1"))) {
             String currentString = Util.convertIntegerToString(i, length);
             String hashValue = hash(currentString);
             if (hashValue.equals(originalHash)){

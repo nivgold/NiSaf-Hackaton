@@ -1,26 +1,28 @@
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 
 public class Util {
     public static int MAX_BUFFER_SIZE = 586;
     public static final String BROADCAST_ADDRESS = "255.255.255.255";
-    public static int convertStringToInt(String string){
+    public static BigInteger convertStringToInt(String string){
         char[] charArray = string.toCharArray();
-        int result = 0;
+        BigInteger result = new BigInteger("0");
         for (char ch : charArray){
             if (ch >= 'a' && ch <= 'z'){
-                result *=26;
-                result += ch - 'a';
+                result = result.multiply(new BigInteger("26"));
+                int x = ch - 'a';
+                result = result.add(new BigInteger(Integer.toString(x)));
             }
         }
         return result;
     }
 
-    public static String convertIntegerToString(int number, int length){
+    public static String convertIntegerToString(BigInteger number, int length){
         StringBuilder stringBuilder = new StringBuilder(length);
-        while (number > 0){
-            int c = number % 26;
-            stringBuilder.insert(0, (char)(c + 'a'));
-            number/=26;
+        while (number.compareTo(new BigInteger("0"))> 0){
+            BigInteger c = number.mod(new BigInteger("26"));
+            stringBuilder.insert(0, (char)(c.intValue() + 'a'));
+            number = number.divide(new BigInteger("26"));
             length--;
         }
         while (length>0){
@@ -30,26 +32,11 @@ public class Util {
         return stringBuilder.toString();
     }
 
-    public static byte[] makePacketData(char[] teamName, char type, char[] hash, int length, char[] start, char[] end){
-        //StringBuilder stringBuilder = new StringBuilder();
-        //stringBuilder.append(teamName);
-        //stringBuilder.append(type);
-        //stringBuilder.append(hash);
-        //for (int i=hash.length; i<40;i++)
-        //    stringBuilder.append(' ');
-        //stringBuilder.append(length);
-        //stringBuilder.append(start);
-        //for (int i=start.length; i<length; i++)
-        //    stringBuilder.append(' ');
-        //stringBuilder.append(end);
-        //for (int i=end.length; i<length; i++)
-        //    stringBuilder.append(' ');
-        //return stringBuilder.toString().getBytes(StandardCharsets.UTF_8);
-
+    public static byte[] makePacketData(char[] teamName, byte type, char[] hash, int length, char[] start, char[] end){
         int payloadSize = 74+2*length;
         byte[] buffer = new byte[payloadSize];
         System.arraycopy(new String(teamName).getBytes(StandardCharsets.UTF_8), 0, buffer, 0, 32);
-        buffer[32] = (byte)type;
+        buffer[32] = type;
         String hashString = new String(hash);
         while (hashString.length()<40)
             hashString = hashString+' ';
@@ -72,5 +59,15 @@ public class Util {
         }catch (Exception e){
             return null;
         }
+    }
+
+    public static boolean isValidHash(String hash){
+        if (hash.length()!=40)
+            return false;
+        for(char ch : hash.toCharArray()){
+            if (!(ch >= 'a' && ch <='f') && !(ch >= '0' && ch <='9'))
+                return false;
+        }
+        return true;
     }
 }
