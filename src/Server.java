@@ -69,13 +69,14 @@ public class Server implements Runnable{
                 System.out.println("Server Received Work");
                 char[] startChars = new char[length];
                 char[] endChars = new char[length];
+                System.out.println("XXXX");
                 for (int i=74 ;i<74+length; i++)
                     startChars[i-74] = (char)clientPacketData[i];
-                if (Util.isValidRange(startChars))
+                if (!Util.isValidRange(startChars))
                     break;
                 for (int i=74+length; i<74+length*2; i++)
                     endChars[i-74-length] = (char)clientPacketData[i];
-                if (Util.isValidRange(endChars))
+                if (!Util.isValidRange(endChars))
                     break;
                 char[] hash = new char[40];
                 for (int i=33; i<73; i++)
