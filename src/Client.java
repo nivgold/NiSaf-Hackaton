@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -20,6 +21,8 @@ public class Client {
 
     public void start(){
         Scanner scanner = new Scanner(System.in);
+        if (TEAM_NAME.length()>32)
+            System.exit(1);
         while (true){
             try {
                 clientSocket.setSoTimeout(750);
@@ -36,7 +39,7 @@ public class Client {
             System.out.println("Please enter the input string length:");
             String lengthString = scanner.nextLine();
             Integer length;
-            while ((length = Util.isInteger(lengthString))==null){
+            while ((length = Util.isValidInteger(lengthString))==null){
                 System.out.println("Invalid length. enter the input string length:");
                 lengthString = scanner.nextLine();
             }
@@ -44,7 +47,6 @@ public class Client {
             byte[] discoverPacketPayload = new byte[payloadSize];
             System.arraycopy(TEAM_NAME.getBytes(StandardCharsets.UTF_8), 0, discoverPacketPayload, 0, 32);
             discoverPacketPayload[32] = '\1';
-            //TODO check that hash is indeed 40 chars
             System.arraycopy(hash.getBytes(StandardCharsets.UTF_8), 0, discoverPacketPayload, 33, 40);
             discoverPacketPayload[73] = length.byteValue();
             // start and end data
@@ -148,22 +150,22 @@ public class Client {
         for (int i=0; i<length; i++)
             stringBuilder.append('z');
         String maxString = stringBuilder.toString();
-        int maxNumber = Util.convertStringToInt(maxString);
-        int division = maxNumber/serverAmount;
+        BigInteger maxNumber = Util.convertStringToInt(maxString);
+        int division = maxNumber.intValue()/serverAmount;
         division = Math.max(1, division);
         String startPos;
         String endPos;
-        for (int i=0; i<Math.min(serverAmount, maxNumber); i++){
+        for (int i=0; i<Math.min(serverAmount, maxNumber.intValue()); i++){
             if (i==0) {
-                startPos = Util.convertIntegerToString(i * division, length);
-                endPos = Util.convertIntegerToString((i + 1) * division, length);
+                startPos = Util.convertIntegerToString(new BigInteger((i * division)+"") , length);
+                endPos = Util.convertIntegerToString(new BigInteger(((i + 1) * division)+""), length);
             }
             else if (i<serverAmount-1){
-                startPos = Util.convertIntegerToString(i * division + 1, length);
-                endPos = Util.convertIntegerToString((i + 1) * division, length);
+                startPos = Util.convertIntegerToString(new BigInteger((i * division + 1)+""), length);
+                endPos = Util.convertIntegerToString(new BigInteger(((i + 1) * division)+""), length);
             }
             else{
-                startPos = Util.convertIntegerToString(i * division + 1, length);
+                startPos = Util.convertIntegerToString(new BigInteger((i * division + 1)+""), length);
                 endPos = maxString;
             }
 

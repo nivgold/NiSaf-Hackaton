@@ -35,6 +35,8 @@ public class Server implements Runnable{
                 serverUDPSocket.receive(datagramPacket);
                 System.out.println("Server Received Packet");
                 DatagramPacket clientPacket = datagramPacket;
+                if (clientPacket.getData().length>Util.MAX_BUFFER_SIZE)
+                    continue;
                 pool.execute(() -> serverStrategy(clientPacket));
             } catch (IOException e) {
                 e.printStackTrace();
@@ -69,9 +71,12 @@ public class Server implements Runnable{
                 char[] endChars = new char[length];
                 for (int i=74 ;i<74+length; i++)
                     startChars[i-74] = (char)clientPacketData[i];
+                if (Util.isValidRange(startChars))
+                    break;
                 for (int i=74+length; i<74+length*2; i++)
                     endChars[i-74-length] = (char)clientPacketData[i];
-
+                if (Util.isValidRange(endChars))
+                    break;
                 char[] hash = new char[40];
                 for (int i=33; i<73; i++)
                     hash[i-33] = (char)clientPacketData[i];
@@ -111,8 +116,8 @@ public class Server implements Runnable{
     }
 
     private String jailbreak(String startPos, String endPos, String originalHash, int length){
-        BigInteger start = new BigInteger(startPos);
-        BigInteger end = new BigInteger(endPos);
+        BigInteger start =Util.convertStringToInt(startPos);
+        BigInteger end = Util.convertStringToInt(endPos);
         for (BigInteger i=start; i.compareTo(end)<=0; i=i.add(new BigInteger("1"))) {
             String currentString = Util.convertIntegerToString(i, length);
             String hashValue = hash(currentString);

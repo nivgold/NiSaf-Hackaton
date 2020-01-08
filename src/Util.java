@@ -53,9 +53,14 @@ public class Util {
         return buffer;
     }
 
-    public static Integer isInteger(String input){
+    public static Integer isValidInteger(String input){
         try{
-            return Integer.parseInt(input);
+            int number = Integer.parseInt(input);
+            if (number<0)
+                return null;
+            if (number>127)
+                return null;
+            return number;
         }catch (Exception e){
             return null;
         }
@@ -66,6 +71,14 @@ public class Util {
             return false;
         for(char ch : hash.toCharArray()){
             if (!(ch >= 'a' && ch <='f') && !(ch >= '0' && ch <='9'))
+                return false;
+        }
+        return true;
+    }
+
+    public static boolean isValidRange(char[] range){
+        for (char ch : range){
+            if (!(ch >= 'a' && ch<= 'z'))
                 return false;
         }
         return true;
