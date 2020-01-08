@@ -21,7 +21,7 @@ public class Client {
 
     public void start(){
         Scanner scanner = new Scanner(System.in);
-        if (TEAM_NAME.length()>32)
+        if (TEAM_NAME.length()>32 || TEAM_NAME.length()<32)
             System.exit(1);
         while (true){
             try {
