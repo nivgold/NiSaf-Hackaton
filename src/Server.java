@@ -69,7 +69,6 @@ public class Server implements Runnable{
                 System.out.println("Server Received Work");
                 char[] startChars = new char[length];
                 char[] endChars = new char[length];
-                System.out.println("XXXX");
                 for (int i=74 ;i<74+length; i++)
                     startChars[i-74] = (char)clientPacketData[i];
                 if (!Util.isValidRange(startChars))

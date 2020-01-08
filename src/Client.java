@@ -8,7 +8,7 @@ import java.util.Scanner;
 public class Client {
     private DatagramSocket clientSocket;
     private int defaultTimeOut;
-    private final String TEAM_NAME = "Doofenshmirtz Evil Inc.         ";
+    private final String TEAM_NAME = "Doofenshmirtz Evil Inc.        ";
 
     public Client() {
         try {
